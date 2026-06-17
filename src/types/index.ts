@@ -75,7 +75,7 @@ export interface Equipment {
 }
 
 export type ScheduleStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-export type ShiftType = 'morning' | 'afternoon' | 'full';
+export type ShiftType = 'day' | 'night' | 'morning' | 'afternoon' | 'full';
 
 export interface Schedule {
   id: string;
@@ -110,33 +110,48 @@ export interface AnchorCheck {
   inspector: string;
 }
 
+export type WorkStatus = 'normal' | 'delayed' | 'stopped' | 'completed';
+export type CheckResult = 'pass' | 'fail' | 'na';
+
 export interface WorkRecord {
   id: string;
   projectId: string;
   projectName: string;
-  scheduleId: string;
+  scheduleId?: string;
   date: string;
+  shift?: ShiftType;
+  status?: WorkStatus;
   weather: string;
-  temperature: number;
-  windSpeed: number;
-  windLevel: number;
-  isWorkable: boolean;
-  progress: number;
+  temperature?: number;
+  windSpeed?: number;
+  windLevel?: number;
+  isWorkable?: boolean;
+  progress?: number;
   workHours: number;
-  personnelIds: string[];
-  personnelNames: string[];
-  briefing: SafetyBriefing | null;
-  anchorChecks: AnchorCheck[];
+  personnelIds?: string[];
+  personnelNames?: string[];
+  workers?: string[];
+  briefing?: SafetyBriefing | null;
+  anchorChecks?: AnchorCheck[];
+  anchorCheck?: CheckResult;
+  equipmentCheck?: CheckResult;
+  safetyBriefing?: string;
+  workContent?: string;
+  completedTasks?: string;
+  issues?: string;
+  supervisor?: string;
   remarks: string;
+  createdAt?: string;
 }
 
-export type TrainingType = 'safety' | 'skill' | 'regulation';
-export type TrainingStatus = 'planned' | 'ongoing' | 'completed';
+export type TrainingType = 'safety' | 'skill' | 'regulation' | 'technical' | 'certificate' | 'new_employee';
+export type TrainingStatus = 'planned' | 'ongoing' | 'completed' | 'upcoming' | 'in_progress' | 'cancelled';
 
 export interface TrainingRecord {
   id: string;
   personnelIds: string[];
   personnelNames: string[];
+  participants?: string[];
   title: string;
   type: TrainingType;
   startDate: string;
@@ -147,22 +162,32 @@ export interface TrainingRecord {
   status: TrainingStatus;
   certificate?: string;
   content: string;
+  location?: string;
+  remarks?: string;
+  createdAt?: string;
 }
 
-export type BillingStatus = 'uninvoiced' | 'invoiced' | 'paid' | 'overdue';
+export type BillingStatus = 'uninvoiced' | 'invoiced' | 'paid' | 'overdue' | 'unpaid' | 'partial' | 'cancelled';
 
 export interface Billing {
   id: string;
   projectId: string;
   projectName: string;
+  customerId?: string;
   amount: number;
+  paidAmount?: number;
   invoiceNo: string;
+  invoiceNumber?: string;
   invoiceDate: string;
+  issueDate?: string;
   dueDate: string;
   paidDate?: string;
+  paymentDate?: string;
   status: BillingStatus;
   remarks?: string;
   payer: string;
+  items?: { description: string; quantity: number; unitPrice: number }[];
+  createdAt?: string;
 }
 
 export interface InspectionRecord {

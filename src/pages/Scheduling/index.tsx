@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { useAppStore } from '@/store/useAppStore';
+import { useState, useMemo } from 'react';
+import { useAppStore, generateId } from '@/store/useAppStore';
 import Card from '@/components/UI/Card';
 import Button from '@/components/UI/Button';
 import StatusBadge from '@/components/UI/StatusBadge';
+import Table from '@/components/UI/Table';
+import Modal, { ConfirmModal, FormField, Input, Select, Textarea } from '@/components/UI/Modal';
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,14 +13,37 @@ import {
   Clock,
   Users,
   Building2,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import type { Schedule } from '@/types';
 
 export default function Scheduling() {
-  const { schedules, projects, personnel } = useAppStore();
+  const { schedules, projects, personnel, addSchedule, updateSchedule, deleteSchedule } = useAppStore();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
+    projectId: '',
+    date: '',
+    shift: 'full' as Schedule['shift'],
+    startTime: '08:00',
+    endTime: '17:00',
+    personnelIds: [] as string[],
+    buildingName: '',
+    floorRange: '',
+    status: 'scheduled' as Schedule['status'],
+    remarks: '',
+  });
+
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -35,6 +60,15 @@ export default function Scheduling() {
   };
 
   const selectedDateSchedules = getSchedulesForDate(selectedDate);
+
+  const weekSchedules = useMemo(() => {
+    const start = selectedDate;
+    const end = addDays(selectedDate, 6);
+    return schedules.filter((s) => {
+      const scheduleDate = new Date(s.date);
+      return scheduleDate >= start && scheduleDate <= end;
+    });
+  }, [schedules, selectedDate]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -66,6 +100,21 @@ export default function Scheduling() {
     }
   };
 
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'in_progress':
+        return 'info';
+      case 'completed':
+        return 'success';
+      case 'scheduled':
+        return 'warning';
+      case 'cancelled':
+        return 'default';
+      default:
+        return 'default';
+    }
+  };
+
   const getShiftLabel = (shift: string) => {
     switch (shift) {
       case 'morning':
@@ -79,8 +128,137 @@ export default function Scheduling() {
     }
   };
 
+  const getProjectName = (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId);
+    return project?.name || '未知项目';
+  };
+
+  const getPersonnelNames = (personnelIds: string[]) => {
+    return personnelIds
+      .map((id) => {
+        const p = personnel.find((per) => per.id === id);
+        return p?.name || '';
+      })
+      .filter(Boolean)
+      .join('、');
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!formData.projectId) errors.projectId = '请选择项目';
+    if (!formData.date) errors.date = '请选择日期';
+    if (formData.personnelIds.length === 0) errors.personnelIds = '请至少选择一名作业人员';
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleOpenAdd = () => {
+    setEditingSchedule(null);
+    setFormData({
+      projectId: '',
+      date: format(selectedDate, 'yyyy-MM-dd'),
+      shift: 'full',
+      startTime: '08:00',
+      endTime: '17:00',
+      personnelIds: [],
+      buildingName: '',
+      floorRange: '',
+      status: 'scheduled',
+      remarks: '',
+    });
+    setFormErrors({});
+    setShowFormModal(true);
+  };
+
+  const handleOpenEdit = (schedule: Schedule) => {
+    setEditingSchedule(schedule);
+    setFormData({
+      projectId: schedule.projectId,
+      date: schedule.date,
+      shift: schedule.shift,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      personnelIds: schedule.personnelIds,
+      buildingName: schedule.buildingName,
+      floorRange: schedule.floorRange,
+      status: schedule.status,
+      remarks: schedule.remarks || '',
+    });
+    setFormErrors({});
+    setShowFormModal(true);
+  };
+
+  const handleDelete = (scheduleId: string) => {
+    setDeletingScheduleId(scheduleId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingScheduleId) {
+      deleteSchedule(deletingScheduleId);
+      setShowDeleteConfirm(false);
+      setDeletingScheduleId(null);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!validateForm()) return;
+
+    const project = projects.find((p) => p.id === formData.projectId);
+
+    if (editingSchedule) {
+      updateSchedule(editingSchedule.id, {
+        projectId: formData.projectId,
+        projectName: project?.name || '',
+        date: formData.date,
+        shift: formData.shift,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        personnelIds: formData.personnelIds,
+        buildingName: formData.buildingName,
+        floorRange: formData.floorRange,
+        status: formData.status,
+        remarks: formData.remarks,
+      });
+    } else {
+      const newSchedule: Schedule = {
+        id: generateId('s'),
+        projectId: formData.projectId,
+        projectName: project?.name || '',
+        date: formData.date,
+        shift: formData.shift,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        personnelIds: formData.personnelIds,
+        personnelNames: getPersonnelNames(formData.personnelIds),
+        buildingName: formData.buildingName,
+        floorRange: formData.floorRange,
+        status: formData.status,
+        remarks: formData.remarks,
+        createdAt: format(new Date(), 'yyyy-MM-dd'),
+      };
+      addSchedule(newSchedule);
+    }
+
+    setShowFormModal(false);
+  };
+
+  const handlePersonnelToggle = (personnelId: string) => {
+    setFormData((prev) => {
+      if (prev.personnelIds.includes(personnelId)) {
+        return { ...prev, personnelIds: prev.personnelIds.filter((id) => id !== personnelId) };
+      } else {
+        return { ...prev, personnelIds: [...prev.personnelIds, personnelId] };
+      }
+    });
+  };
+
   const firstDay = days[0].getDay();
   const paddingDays = Array(firstDay).fill(null);
+
+  const activeProjects = projects.filter((p) => p.status === 'in_progress' || p.status === 'pending');
+
+  const availablePersonnel = personnel.filter((p) => p.status === 'active');
 
   return (
     <div className="space-y-6">
@@ -89,270 +267,413 @@ export default function Scheduling() {
           <h1 className="text-2xl font-bold text-slate-800">作业排期</h1>
           <p className="text-slate-500 mt-1">管理作业计划和人员排班</p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />}>新建排期</Button>
+        <Button icon={<Plus className="w-4 h-4" />} onClick={handleOpenAdd}>
+          新建排期
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <Card.Header>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h2 className="text-lg font-semibold text-slate-800">
-                  {format(currentMonth, 'yyyy年MM月', { locale: zhCN })}
-                </h2>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={prevMonth}
-                    className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-slate-500" />
-                  </button>
-                  <button
-                    onClick={() => setCurrentMonth(new Date())}
-                    className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    今天
-                  </button>
-                  <button
-                    onClick={nextMonth}
-                    className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5 text-slate-500" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                  <span className="text-slate-600">进行中</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                  <span className="text-slate-600">已排期</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  <span className="text-slate-600">已完成</span>
-                </div>
-              </div>
-            </div>
-          </Card.Header>
-          <Card.Body className="p-4">
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {weekDays.map((day) => (
-                <div
-                  key={day}
-                  className="text-center text-sm font-medium text-slate-500 py-2"
+            <div className="flex items-center gap-4">
+              <h2 className="text-lg font-semibold text-slate-800">
+                {format(currentMonth, 'yyyy年MM月', { locale: zhCN })}
+              </h2>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={prevMonth}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
                 >
-                  {day}
-                </div>
-              ))}
+                  <ChevronLeft className="w-5 h-5 text-slate-600" />
+                </button>
+                <button
+                  onClick={nextMonth}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5 text-slate-600" />
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-7 gap-1">
-              {paddingDays.map((_, idx) => (
-                <div key={`pad-${idx}`} className="h-28 p-2"></div>
-              ))}
-              {days.map((day) => {
+            <button
+              onClick={() => setCurrentMonth(new Date())}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              今天
+            </button>
+          </div>
+        </Card.Header>
+        <Card.Body>
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {weekDays.map((day) => (
+              <div
+                key={day}
+                className="text-center text-sm font-medium text-slate-500 py-2"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {paddingDays.map((_, index) => (
+              <div key={`padding-${index}`} className="aspect-square" />
+            ))}
+            {days.map((day) => {
                 const daySchedules = getSchedulesForDate(day);
                 const isSelected = isSameDay(day, selectedDate);
                 const isCurrentMonth = isSameMonth(day, currentMonth);
+                const isTodayDate = isToday(day);
 
                 return (
-                  <div
-                    key={day.toISOString()}
-                    onClick={() => setSelectedDate(day)}
-                    className={`h-28 p-2 rounded-lg cursor-pointer transition-all border ${
-                      isSelected
-                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                        : 'border-transparent hover:bg-slate-50'
-                    } ${!isCurrentMonth ? 'opacity-40' : ''}`}
+                  <button
+                  key={day.toISOString()}
+                  onClick={() => setSelectedDate(day)}
+                  className={`
+                    aspect-square p-1 rounded-lg transition-all text-left flex flex-col
+                    ${isSelected ? 'bg-blue-500 text-white' : ''}
+                    ${!isSelected && isCurrentMonth ? 'hover:bg-slate-100' : ''}
+                    ${!isCurrentMonth ? 'opacity-40' : ''}
+                    ${isToday && !isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}
+                  `}
+                >
+                  <span
+                    className={`
+                      text-sm font-medium
+                      ${isSelected ? 'text-white' : isToday && isCurrentMonth ? 'text-slate-800' : 'text-slate-400'}
+                    `}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span
-                        className={`text-sm font-medium ${
-                          isToday(day)
-                            ? 'w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center'
-                            : isSelected
-                            ? 'text-blue-600'
-                            : 'text-slate-700'
-                        }`}
-                      >
-                        {format(day, 'd')}
-                      </span>
-                      {daySchedules.length > 0 && (
-                        <span className="text-xs text-slate-500">
-                          {daySchedules.length}项
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-1 overflow-hidden">
-                      {daySchedules.slice(0, 2).map((schedule) => (
-                        <div
-                          key={schedule.id}
-                          className={`text-xs px-2 py-1 rounded ${getStatusColor(
-                            schedule.status
-                          )} text-white truncate`}
-                        >
-                          {schedule.building}
-                        </div>
-                      ))}
-                      {daySchedules.length > 2 && (
-                        <div className="text-xs text-slate-500 px-2">
-                          +{daySchedules.length - 2} 更多
-                        </div>
-                      )}
-                    </div>
+                    {format(day, 'd')}
+                  </span>
+                  <div className="flex flex-wrap gap-0.5 mt-1">
+                    {daySchedules.slice(0, 2).map((schedule) => (
+                      <div
+                        key={schedule.id}
+                        className={`
+                          w-1.5 h-1.5 rounded-full
+                          ${getStatusColor(schedule.status)}
+                        `}
+                      />
+                    ))}
+                    {daySchedules.length > 2 && (
+                      <span className="text-xs opacity-60">+{daySchedules.length - 2}</span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </Card.Body>
-        </Card>
+                </button>
+              );
+            })}
+          </div>
+        </Card.Body>
+      </Card>
 
         <Card>
           <Card.Header>
-            <div className="flex items-center justify-between">
-              <Card.Title>
-                {format(selectedDate, 'MM月dd日 EEEE', { locale: zhCN })}
-              </Card.Title>
-              <CalendarIcon className="w-5 h-5 text-slate-400" />
-            </div>
+            <h2 className="text-lg font-semibold text-slate-800">
+              {format(selectedDate, 'M月d日', { locale: zhCN })} 排期
+            </h2>
           </Card.Header>
           <Card.Body>
-            {selectedDateSchedules.length > 0 ? (
-              <div className="space-y-3">
-                {selectedDateSchedules.map((schedule) => (
+            <div className="space-y-3">
+              {selectedDateSchedules.length > 0 ? (
+                selectedDateSchedules.map((schedule) => (
                   <div
                     key={schedule.id}
-                    className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-sm transition-shadow"
+                    className="p-3 bg-slate-50 rounded-xl border border-slate-100"
                   >
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-medium text-slate-800">{schedule.building}</h4>
-                        <p className="text-sm text-slate-500 mt-0.5">{schedule.projectName}</p>
+                        <p className="font-medium text-slate-800 text-sm">
+                          {schedule.projectName}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {schedule.buildingName} · {getShiftLabel(schedule.shift)}
+                        </p>
                       </div>
-                      <StatusBadge
-                        variant={
-                          schedule.status === 'in_progress'
-                            ? 'info'
-                            : schedule.status === 'completed'
-                            ? 'success'
-                            : 'pending'
-                        }
-                      >
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(schedule)}
+                          className="p-1 hover:bg-white rounded transition-colors text-slate-400 hover:text-blue-600"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(schedule.id)}
+                          className="p-1 hover:bg-white rounded transition-colors text-slate-400 hover:text-red-600"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <StatusBadge variant={getStatusBadgeVariant(schedule.status) as any}>
                         {getStatusLabel(schedule.status)}
                       </StatusBadge>
+                      <span className="text-xs text-slate-500">
+                        {schedule.startTime} - {schedule.endTime}
+                      </span>
                     </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Clock className="w-4 h-4 text-slate-400" />
-                        <span>{getShiftLabel(schedule.shift)}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Users className="w-4 h-4 text-slate-400" />
-                        <span>{schedule.personnelNames.length} 人作业</span>
-                      </div>
+                    <div className="flex items-center gap-1 mt-2 text-xs text-slate-500">
+                      <Users className="w-3 h-3" />
+                      <span>{schedule.personnelIds.length}人</span>
                     </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="flex -space-x-2">
-                        {schedule.personnelNames.slice(0, 4).map((name, idx) => (
-                          <div
-                            key={idx}
-                            className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-white flex items-center justify-center text-xs text-white font-medium"
-                          >
-                            {name.charAt(0)}
-                          </div>
-                        ))}
-                      </div>
-                      {schedule.personnelNames.length > 4 && (
-                        <span className="text-xs text-slate-500">
-                          +{schedule.personnelNames.length - 4}
-                        </span>
-                      )}
-                    </div>
-                    {schedule.remarks && (
-                      <p className="mt-3 text-xs text-slate-500 bg-white p-2 rounded-lg">
-                        {schedule.remarks}
-                      </p>
-                    )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <CalendarIcon className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                <p className="text-slate-500">当天暂无作业安排</p>
-                <Button variant="outline" size="sm" className="mt-4">
-                  添加排期
-                </Button>
-              </div>
-            )}
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-sm">
+                  当天暂无排期
+                </div>
+              )}
+            </div>
           </Card.Body>
         </Card>
       </div>
 
       <Card>
         <Card.Header>
-          <Card.Title>本周排期</Card.Title>
+          <h2 className="text-lg font-semibold text-slate-800">本周排期</h2>
         </Card.Header>
         <Card.Body className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50">
-                <tr>
-                  <th className="px-6 py-3 font-medium">日期</th>
-                  <th className="px-6 py-3 font-medium">项目</th>
-                  <th className="px-6 py-3 font-medium">作业楼栋</th>
-                  <th className="px-6 py-3 font-medium">班次</th>
-                  <th className="px-6 py-3 font-medium">人员</th>
-                  <th className="px-6 py-3 font-medium">状态</th>
-                  <th className="px-6 py-3 font-medium">备注</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {schedules.slice(0, 6).map((schedule) => (
-                  <tr key={schedule.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{schedule.date}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-slate-700">{schedule.projectName}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-slate-700">{schedule.building}</div>
-                    </td>
-                    <td className="px-6 py-4">
+          <Table>
+            <Table.Header>
+              <tr>
+                <Table.Head>日期</Table.Head>
+                <Table.Head>项目</Table.Head>
+                <Table.Head>楼栋</Table.Head>
+                <Table.Head>班次</Table.Head>
+                <Table.Head>时间</Table.Head>
+                <Table.Head>作业人员</Table.Head>
+                <Table.Head>状态</Table.Head>
+                <Table.Head className="text-right">操作</Table.Head>
+              </tr>
+            </Table.Header>
+            <Table.Body>
+              {weekSchedules.length > 0 ? (
+                weekSchedules.map((schedule) => (
+                  <Table.Row key={schedule.id}>
+                    <Table.Cell>
+                      <span className="font-medium text-slate-800">{schedule.date}</span>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <span className="text-slate-700">{schedule.projectName}</span>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <span className="text-slate-600">{schedule.buildingName}</span>
+                    </Table.Cell>
+                    <Table.Cell>
                       <span className="text-slate-600">{getShiftLabel(schedule.shift)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1">
-                        <Users className="w-4 h-4 text-slate-400" />
-                        <span className="text-slate-600">{schedule.personnelNames.length}人</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge
-                        variant={
-                          schedule.status === 'in_progress'
-                            ? 'info'
-                            : schedule.status === 'completed'
-                            ? 'success'
-                            : 'pending'
-                        }
-                      >
+                    </Table.Cell>
+                    <Table.Cell>
+                      <span className="text-slate-600">
+                        {schedule.startTime} - {schedule.endTime}
+                      </span>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <span className="text-slate-600 text-sm">
+                        {schedule.personnelIds.length} 人
+                      </span>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <StatusBadge variant={getStatusBadgeVariant(schedule.status) as any}>
                         {getStatusLabel(schedule.status)}
                       </StatusBadge>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {schedule.remarks || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </Table.Cell>
+                    <Table.Cell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(schedule)}
+                          className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-blue-600"
+                          title="编辑"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(schedule.id)}
+                          className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-slate-500 hover:text-red-600"
+                          title="删除"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </Table.Cell>
+                  </Table.Row>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                  本周暂无排期
+                </td>
+              </tr>
+              )}
+            </Table.Body>
+          </Table>
         </Card.Body>
       </Card>
+
+      <Modal
+        isOpen={showFormModal}
+        onClose={() => setShowFormModal(false)}
+        title={editingSchedule ? '编辑排期' : '新建排期'}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setShowFormModal(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSubmit}>
+              {editingSchedule ? '保存修改' : '创建排期'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="项目" required error={formErrors.projectId}>
+              <Select
+                value={formData.projectId}
+                onChange={(e) => {
+                  const project = projects.find((p) => p.id === e.target.value);
+                  setFormData({
+                    ...formData,
+                    projectId: e.target.value,
+                    buildingName: project?.buildingType || '',
+                  });
+                }}
+                error={!!formErrors.projectId}
+              >
+                <option value="">请选择项目</option>
+                {activeProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="日期" required error={formErrors.date}>
+              <Input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                error={!!formErrors.date}
+              />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <FormField label="班次">
+              <Select
+                value={formData.shift}
+                onChange={(e) => setFormData({ ...formData, shift: e.target.value as any })}
+              >
+                <option value="full">全天</option>
+                <option value="morning">上午班</option>
+                <option value="afternoon">下午班</option>
+              </Select>
+            </FormField>
+            <FormField label="开始时间">
+              <Input
+                type="time"
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+              />
+            </FormField>
+            <FormField label="结束时间">
+              <Input
+                type="time"
+                value={formData.endTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+              />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="楼栋名称">
+              <Input
+                value={formData.buildingName}
+                onChange={(e) => setFormData({ ...formData, buildingName: e.target.value })}
+                placeholder="如：A栋写字楼"
+              />
+            </FormField>
+            <FormField label="作业楼层">
+              <Input
+                value={formData.floorRange}
+                onChange={(e) => setFormData({ ...formData, floorRange: e.target.value })}
+                placeholder="如：1-10层"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="状态">
+            <Select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  status: e.target.value as any,
+                })
+              }
+            >
+              <option value="scheduled">已排期</option>
+              <option value="in_progress">进行中</option>
+              <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
+            </Select>
+          </FormField>
+
+          <FormField label="作业人员" required error={formErrors.personnelIds}>
+            <div className="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto">
+              {availablePersonnel.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {availablePersonnel.map((p) => (
+                    <label
+                      key={p.id}
+                      className={`
+                        flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors
+                        ${formData.personnelIds.includes(p.id) ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50'}
+                      `}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.personnelIds.includes(p.id)}
+                        onChange={() => handlePersonnelToggle(p.id)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-slate-700">{p.name}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400 text-center py-2">暂无可用人员</p>
+              )}
+            </div>
+          </FormField>
+
+          <FormField label="备注">
+            <Textarea
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              rows={3}
+              placeholder="请输入备注信息"
+            />
+          </FormField>
+        </div>
+      </Modal>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setDeletingScheduleId(null);
+        }}
+        onConfirm={confirmDelete}
+        title="确认删除排期"
+        variant="danger"
+        confirmText="确认删除"
+        message={
+          <div className="space-y-2">
+            <p className="text-slate-600">确定要删除该排期吗？</p>
+            <p className="text-sm text-red-500 font-medium">⚠️ 删除后无法恢复，请谨慎操作！</p>
+          </div>
+        }
+      />
     </div>
   );
 }
