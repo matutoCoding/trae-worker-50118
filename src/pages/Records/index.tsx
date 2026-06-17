@@ -62,8 +62,8 @@ export default function Records() {
     return workRecords.filter((r) => {
       const project = projects.find((p) => p.id === r.projectId);
       const matchSearch =
-        project?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.workContent.toLowerCase().includes(searchTerm.toLowerCase());
+        (project?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (r.workContent || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchStatus = statusFilter === 'all' || r.status === statusFilter;
       const matchProject = projectFilter === 'all' || r.projectId === projectFilter;
       return matchSearch && matchStatus && matchProject;
@@ -100,7 +100,7 @@ export default function Records() {
     }
   };
 
-  const getCheckLabel = (check: string) => {
+  const getCheckLabel = (check: string | undefined) => {
     switch (check) {
       case 'pass':
         return '合格';
@@ -109,7 +109,7 @@ export default function Records() {
       case 'na':
         return '不适用';
       default:
-        return check;
+        return '-';
     }
   };
 
@@ -264,7 +264,7 @@ export default function Records() {
   const activePersonnel = personnel.filter((p) => p.status === 'active');
   const activeProjects = projects.filter((p) => p.status === 'in_progress' || p.status === 'pending');
 
-  const totalWorkHours = workRecords.reduce((sum, r) => sum + r.workHours, 0);
+  const totalWorkHours = workRecords.reduce((sum, r) => sum + (r.workHours || 0), 0);
   const abnormalCount = workRecords.filter(
     (r) => r.anchorCheck === 'fail' || r.equipmentCheck === 'fail' || r.status === 'stopped'
   ).length;
@@ -521,7 +521,6 @@ export default function Records() {
                 value={formData.weather}
                 onChange={(e) => setFormData({ ...formData, weather: e.target.value })}
                 placeholder="如：晴"
-                icon={<Wind className="w-4 h-4" />}
               />
             </FormField>
             <FormField label="温度(℃)">
@@ -530,7 +529,6 @@ export default function Records() {
                 value={formData.temperature}
                 onChange={(e) => setFormData({ ...formData, temperature: e.target.value })}
                 placeholder="如：25"
-                icon={<Thermometer className="w-4 h-4" />}
               />
             </FormField>
             <FormField label="风速(m/s)">

@@ -5,7 +5,7 @@ import Button from '@/components/UI/Button';
 import Table from '@/components/UI/Table';
 import StatusBadge from '@/components/UI/StatusBadge';
 import Modal, { ConfirmModal, FormField, Input, Select, Textarea } from '@/components/UI/Modal';
-import { Plus, Search, DollarSign, FileInvoice, CheckCircle, Clock, AlertCircle, Edit2, Trash2, Eye, TrendingUp } from 'lucide-react';
+import { Plus, Search, DollarSign, FileText, CheckCircle, Clock, AlertCircle, Edit2, Trash2, Eye, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Billing } from '@/types';
 
@@ -43,9 +43,9 @@ export default function Billing() {
       const project = projects.find((p) => p.id === b.projectId);
       const customer = customers.find((c) => c.id === b.customerId);
       const matchSearch =
-        project?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase());
+        (project?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (b.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchStatus = statusFilter === 'all' || b.status === statusFilter;
       const matchProject = projectFilter === 'all' || b.projectId === projectFilter;
       return matchSearch && matchStatus && matchProject;
@@ -482,7 +482,6 @@ export default function Billing() {
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 error={!!formErrors.amount}
                 placeholder="请输入开票金额"
-                icon={<DollarSign className="w-4 h-4" />}
               />
             </FormField>
             <FormField label="已收金额(元)">
@@ -491,7 +490,6 @@ export default function Billing() {
                 value={formData.paidAmount}
                 onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value })}
                 placeholder="请输入已收金额"
-                icon={<TrendingUp className="w-4 h-4" />}
               />
             </FormField>
           </div>

@@ -41,8 +41,8 @@ export default function Training() {
   const filteredTraining = useMemo(() => {
     return trainingRecords.filter((t) => {
       const matchSearch =
-        t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.trainer.toLowerCase().includes(searchTerm.toLowerCase());
+        (t.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.trainer || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
       const matchType = typeFilter === 'all' || t.type === typeFilter;
       return matchSearch && matchStatus && matchType;
@@ -313,7 +313,7 @@ export default function Training() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <Users className="w-4 h-4 text-slate-400" />
-                      <span>{training.personnelIds.length} 人参加</span>
+                      <span>{(training.personnelIds || []).length} 人参加</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <Clock className="w-4 h-4 text-slate-400" />
@@ -405,7 +405,7 @@ export default function Training() {
                         <span className="text-slate-600">{training.duration}h</span>
                       </Table.Cell>
                       <Table.Cell>
-                        <span className="text-slate-600">{training.personnelIds.length} 人</span>
+                        <span className="text-slate-600">{(training.personnelIds || []).length} 人</span>
                       </Table.Cell>
                       <Table.Cell>
                         <StatusBadge variant={statusInfo.variant}>{statusInfo.label}</StatusBadge>
@@ -673,11 +673,11 @@ export default function Training() {
 
             <div>
               <h4 className="font-medium text-slate-800 mb-3">
-                参训人员 ({viewingTraining.personnelIds.length} 人)
+                参训人员 ({(viewingTraining?.personnelIds || []).length} 人)
               </h4>
               <div className="flex flex-wrap gap-2">
-                {viewingTraining.personnelIds.length > 0 ? (
-                  viewingTraining.personnelIds.map((pId) => {
+                {(viewingTraining?.personnelIds || []).length > 0 ? (
+                  (viewingTraining?.personnelIds || []).map((pId) => {
                     const person = personnel.find((p) => p.id === pId);
                     return (
                       <span

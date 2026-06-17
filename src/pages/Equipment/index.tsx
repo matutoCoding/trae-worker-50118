@@ -40,8 +40,8 @@ export default function Equipment() {
   const filteredEquipment = useMemo(() => {
     return equipment.filter((eq) => {
       const matchSearch =
-        eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        eq.serialNumber.toLowerCase().includes(searchTerm.toLowerCase());
+        (eq.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (eq.serialNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchType = typeFilter === 'all' || eq.type === typeFilter;
       const matchStatus = statusFilter === 'all' || eq.status === statusFilter;
       return matchSearch && matchType && matchStatus;
@@ -95,7 +95,8 @@ export default function Equipment() {
     }
   };
 
-  const getDaysUntilNextInspection = (nextDate: string) => {
+  const getDaysUntilNextInspection = (nextDate: string | undefined) => {
+    if (!nextDate) return 999;
     const today = new Date();
     const next = parseISO(nextDate);
     return differenceInDays(next, today);
@@ -393,7 +394,7 @@ export default function Equipment() {
                       </Table.Cell>
                       <Table.Cell>
                         <span className="text-slate-600">
-                          {eq.brand} / {eq.model}
+                          {eq.brand || '-'} / {eq.model || '-'}
                         </span>
                       </Table.Cell>
                       <Table.Cell>

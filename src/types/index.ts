@@ -27,6 +27,7 @@ export interface Customer {
   phone: string;
   address: string;
   industry: string;
+  remarks?: string;
   createdAt: string;
 }
 
@@ -35,12 +36,17 @@ export type PersonnelStatus = 'active' | 'inactive' | 'leave';
 export interface Personnel {
   id: string;
   name: string;
-  idCard: string;
+  idCard?: string;
+  idNumber?: string;
   phone: string;
   position: string;
   status: PersonnelStatus;
-  hireDate: string;
+  hireDate?: string;
+  entryDate?: string;
+  address?: string;
+  remarks?: string;
   avatar?: string;
+  createdAt?: string;
 }
 
 export type CertificateStatus = 'valid' | 'expiring' | 'expired';
@@ -50,11 +56,15 @@ export interface Certificate {
   personnelId: string;
   personnelName: string;
   type: string;
-  certificateNo: string;
+  certificateNo?: string;
+  certNumber?: string;
   issueDate: string;
   expiryDate: string;
   status: CertificateStatus;
-  issueAuthority: string;
+  issueAuthority?: string;
+  issuingAuthority?: string;
+  remarks?: string;
+  createdAt?: string;
 }
 
 export type EquipmentType = 'rope' | 'harness' | 'helmet' | 'carabiner' | 'other';
@@ -65,13 +75,19 @@ export interface Equipment {
   name: string;
   type: EquipmentType;
   model: string;
-  serialNo: string;
+  serialNo?: string;
+  serialNumber?: string;
+  brand?: string;
   purchaseDate: string;
+  inspectionCycle?: number;
   lastInspectionDate: string;
   nextInspectionDate: string;
   status: EquipmentStatus;
-  usageCount: number;
-  specification: string;
+  location?: string;
+  usageCount?: number;
+  specification?: string;
+  remarks?: string;
+  createdAt?: string;
 }
 
 export type ScheduleStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -85,10 +101,15 @@ export interface Schedule {
   shift: ShiftType;
   personnelIds: string[];
   personnelNames: string[];
-  equipmentIds: string[];
+  equipmentIds?: string[];
   status: ScheduleStatus;
-  building: string;
+  building?: string;
+  buildingName?: string;
+  startTime?: string;
+  endTime?: string;
+  floorRange?: string;
   remarks?: string;
+  createdAt?: string;
 }
 
 export interface SafetyBriefing {
@@ -116,7 +137,7 @@ export type CheckResult = 'pass' | 'fail' | 'na';
 export interface WorkRecord {
   id: string;
   projectId: string;
-  projectName: string;
+  projectName?: string;
   scheduleId?: string;
   date: string;
   shift?: ShiftType;
@@ -150,7 +171,7 @@ export type TrainingStatus = 'planned' | 'ongoing' | 'completed' | 'upcoming' | 
 export interface TrainingRecord {
   id: string;
   personnelIds: string[];
-  personnelNames: string[];
+  personnelNames?: string[];
   participants?: string[];
   title: string;
   type: TrainingType;
@@ -172,20 +193,20 @@ export type BillingStatus = 'uninvoiced' | 'invoiced' | 'paid' | 'overdue' | 'un
 export interface Billing {
   id: string;
   projectId: string;
-  projectName: string;
+  projectName?: string;
   customerId?: string;
   amount: number;
   paidAmount?: number;
-  invoiceNo: string;
+  invoiceNo?: string;
   invoiceNumber?: string;
-  invoiceDate: string;
+  invoiceDate?: string;
   issueDate?: string;
-  dueDate: string;
+  dueDate?: string;
   paidDate?: string;
   paymentDate?: string;
   status: BillingStatus;
   remarks?: string;
-  payer: string;
+  payer?: string;
   items?: { description: string; quantity: number; unitPrice: number }[];
   createdAt?: string;
 }

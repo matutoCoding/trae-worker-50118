@@ -143,6 +143,15 @@ export default function Scheduling() {
       .join('、');
   };
 
+  const getPersonnelNameArray = (personnelIds: string[]) => {
+    return personnelIds
+      .map((id) => {
+        const p = personnel.find((per) => per.id === id);
+        return p?.name || '';
+      })
+      .filter(Boolean);
+  };
+
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!formData.projectId) errors.projectId = '请选择项目';
@@ -230,7 +239,7 @@ export default function Scheduling() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         personnelIds: formData.personnelIds,
-        personnelNames: getPersonnelNames(formData.personnelIds),
+        personnelNames: getPersonnelNameArray(formData.personnelIds),
         buildingName: formData.buildingName,
         floorRange: formData.floorRange,
         status: formData.status,
